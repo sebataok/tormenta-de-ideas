@@ -213,6 +213,12 @@ function startAdvance(ideaId) {
 
 // -------- Boot --------
 (async () => {
+  // Defensa: forzar cierre de overlays al arrancar, por si algún estilo los abrió.
+  ['modal', 'transcript', 'transcript-actions', 'toast'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = true;
+  });
+
   await Storage.init();
 
   // Vista PIN o directo al main

@@ -16,6 +16,10 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+
+/* CRÍTICO: el atributo HTML hidden debe ganar sobre cualquier display: * de las clases.
+   Sin esto, .modal (display:flex) tapa el keypad de PIN aunque el HTML diga hidden. */
+[hidden] { display: none !important; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
   background: radial-gradient(1200px 800px at 30% -10%, #1e293b 0%, #0f172a 60%);
@@ -59,7 +63,9 @@ button { font-family: inherit; cursor: pointer; }
 }
 .pin-pad {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; max-width: 300px; margin-top: 8px;
+  position: relative; z-index: 1000; /* por encima de cualquier overlay accidental */
 }
+.pin-key { position: relative; z-index: 1001; }
 .pin-key {
   aspect-ratio: 1 / 1; border: 1px solid var(--border); background: var(--bg-elev); color: var(--fg);
   border-radius: 50%; font-size: 24px; font-weight: 500; transition: transform 80ms, background 120ms;

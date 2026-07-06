@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <title>Tormenta de Ideas</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Tormenta" />
+  <link rel="apple-touch-icon" href="./icons/icon-180.png" />
+
+  <link rel="stylesheet" href="./css/app.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- Vista PIN -->
+    <section id="view-pin" class="view active">
+      <div class="pin-wrap">
+        <h1 class="brand">⚡ Tormenta<span>de Ideas</span></h1>
+        <p class="pin-hint" id="pin-hint">Ingresá tu PIN de 4 dígitos</p>
+        <div class="pin-dots">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+        <div class="pin-pad">
+          <button class="pin-key" data-key="1">1</button>
+          <button class="pin-key" data-key="2">2</button>
+          <button class="pin-key" data-key="3">3</button>
+          <button class="pin-key" data-key="4">4</button>
+          <button class="pin-key" data-key="5">5</button>
+          <button class="pin-key" data-key="6">6</button>
+          <button class="pin-key" data-key="7">7</button>
+          <button class="pin-key" data-key="8">8</button>
+          <button class="pin-key" data-key="9">9</button>
+          <button class="pin-key ghost" id="pin-reset" title="Reset">↺</button>
+          <button class="pin-key" data-key="0">0</button>
+          <button class="pin-key ghost" id="pin-del" title="Borrar">⌫</button>
+        </div>
+        <p class="ios-hint" id="ios-hint" hidden>
+          💡 Tip: en iPhone tocá <b>Compartir</b> ⬆ → <b>Agregar a Inicio</b> para instalarla como app.
+        </p>
+      </div>
+    </section>
+
+    <!-- Vista principal -->
+    <section id="view-main" class="view">
+      <header class="topbar">
+        <h1 class="brand-small">⚡ Tormenta</h1>
+        <div class="sync-badge" id="sync-badge" title="Estado de sincronización">●</div>
+      </header>
+
+      <main class="main">
+        <div class="record-area">
+          <button id="btn-record" class="record-btn">
+            <span class="record-icon">🎤</span>
+            <span class="record-label" id="record-label">Nueva idea</span>
+          </button>
+          <p class="record-hint" id="record-hint">Mantené presionado o tocá para hablar</p>
+          <div class="transcript" id="transcript" hidden></div>
+          <div class="transcript-actions" id="transcript-actions" hidden>
+            <button class="btn secondary" id="btn-discard">Descartar</button>
+            <button class="btn primary" id="btn-confirm">Guardar idea</button>
+          </div>
+        </div>
+
+        <div class="ideas-section">
+          <div class="ideas-header">
+            <h2>Ideas capturadas</h2>
+            <span class="ideas-count" id="ideas-count">0</span>
+          </div>
+          <ul class="ideas-list" id="ideas-list">
+            <li class="empty-state">Ninguna idea todavía. Tocá el botón grande y contá algo.</li>
+          </ul>
+        </div>
+      </main>
+    </section>
+
+    <!-- Modal detalle idea -->
+    <div id="modal" class="modal" hidden>
+      <div class="modal-panel">
+        <div class="modal-head">
+          <h3 id="modal-title">Idea</h3>
+          <button class="close" id="modal-close">✕</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+      </div>
+    </div>
+
+    <!-- Toasts -->
+    <div id="toast" class="toast" hidden></div>
+  </div>
+
+  <!-- Config: URL de Supabase y anon key. Se rellena por el usuario. -->
+  <script>
+    window.TORMENTA_CONFIG = {
+      SUPABASE_URL:  "https://aspqpyjgzkcvukxezxgz.supabase.co",
+      SUPABASE_ANON: "sb_publishable_fBzD7TkOP5Gi50qKnrZvUA_6VbZZdR8",
+      APP_VERSION:   "0.1.0"
+    };
+  </script>
+
+  <script type="module" src="./js/storage.js"></script>
+  <script type="module" src="./js/voice.js"></script>
+  <script type="module" src="./js/pin.js"></script>
+  <script type="module" src="./js/app.js"></script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(err => {
+          console.warn('SW register error', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

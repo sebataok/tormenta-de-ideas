@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tormenta.ideas</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>cd "/Users/sebastiangonzalez/Documents/Claude/Projects/Taok y Seba/tormenta-de-ideas/backend" &amp;&amp; ./.venv/bin/python process_backlog.py &gt;&gt; "$HOME/Library/Logs/tormenta.log" 2&gt;&amp;1</string>
+  </array>
+
+  <key>StartInterval</key>
+  <integer>900</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/sebastiangonzalez/Library/Logs/tormenta.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/sebastiangonzalez/Library/Logs/tormenta.err</string>
+</dict>
+</plist>

@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es-CL"><head><meta charset="utf-8">
+<title>Preview PWA — Tormenta de Ideas</title>
+<style>
+  :root {
+    --bg:#0f172a; --bg-elev:#1e293b; --bg-elev-2:#334155;
+    --fg:#f1f5f9; --muted:#94a3b8; --accent:#f59e0b; --accent-2:#fbbf24;
+    --danger:#ef4444; --ok:#10b981; --border:#334155; --radius:14px;
+  }
+  body {
+    margin:0; padding:40px 20px;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background:#e2e8f0;
+    color:#0f172a;
+    display:flex; flex-direction:column; align-items:center; gap:40px;
+  }
+  h1.desc { font-size:16px; color:#475569; margin:0; text-align:center; max-width:640px; }
+  .phones { display:flex; gap:40px; flex-wrap:wrap; justify-content:center; }
+  .phone {
+    width:390px; height:844px;
+    border-radius:48px; background:#000;
+    padding:14px;
+    box-shadow: 0 30px 80px rgba(15,23,42,.35), 0 6px 12px rgba(15,23,42,.2);
+    position:relative;
+  }
+  .phone::before {
+    content:""; position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    width:120px; height:32px; background:#000; border-radius:22px; z-index:5;
+  }
+  .screen {
+    width:100%; height:100%; border-radius:36px; overflow:hidden; background:var(--bg);
+    color:var(--fg);
+    display:flex; flex-direction:column;
+    position:relative;
+  }
+  .phone-label { position:absolute; bottom:-32px; left:0; width:100%; text-align:center; color:#475569; font-size:13px; font-weight:600; }
+
+  /* ------ pantalla PIN ------ */
+  .pin { background: radial-gradient(1200px 800px at 30% -10%, #1e293b 0%, #0f172a 60%); flex:1; padding:40px 30px 30px; text-align:center; }
+  .pin .brand { font-size:32px; font-weight:700; letter-spacing:-.5px; margin:30px 0 4px; }
+  .pin .brand span { display:block; font-size:16px; color:var(--muted); font-weight:500; margin-top:4px; }
+  .pin-hint { color:var(--muted); font-size:14px; margin:26px 0 18px; }
+  .pin-dots { display:flex; gap:14px; justify-content:center; margin:0 0 30px; }
+  .pin-dots .dot { width:14px; height:14px; border-radius:50%; background:var(--bg-elev-2); border:2px solid var(--border); }
+  .pin-dots .dot.filled { background:var(--accent); border-color:var(--accent); }
+  .pin-pad { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; max-width:260px; margin:0 auto; }
+  .pin-key {
+    aspect-ratio:1/1; border:1px solid var(--border); background:var(--bg-elev); color:var(--fg);
+    border-radius:50%; font-size:22px; font-weight:500;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .pin-key.ghost { background:transparent; border-color:transparent; color:var(--muted); font-size:18px; }
+  .ios-hint { color:var(--muted); font-size:11px; margin:16px 0 0; line-height:1.5; padding:0 10px; }
+
+  /* ------ pantalla principal ------ */
+  .main { background: radial-gradient(1200px 800px at 30% -10%, #1e293b 0%, #0f172a 60%); flex:1; display:flex; flex-direction:column; }
+  .topbar {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:38px 20px 12px; border-bottom:1px solid var(--border);
+    background:rgba(15,23,42,.85);
+  }
+  .topbar .brand-small { font-size:16px; font-weight:700; margin:0; }
+  .sync-badge { color:var(--ok); font-size:18px; }
+  .main-body { padding:24px 18px 18px; overflow:hidden; flex:1; display:flex; flex-direction:column; }
+
+  .record-area { text-align:center; margin:6px 0 20px; }
+  .record-btn {
+    width:170px; height:170px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#0f172a; border:none; box-shadow:0 8px 22px rgba(245,158,11,.3);
+    font-size:19px; font-weight:700;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    margin:0 auto;
+  }
+  .record-icon { font-size:42px; margin-bottom:2px; }
+  .record-hint { color:var(--muted); font-size:12px; margin-top:14px; }
+
+  .ideas-section h2 { font-size:14px; margin:0 0 10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:600; display:flex; justify-content:space-between; align-items:baseline; }
+  .ideas-section h2 .count { background:var(--bg-elev); padding:2px 10px; border-radius:10px; font-size:11px; text-transform:none; letter-spacing:0; }
+  .ideas-list { display:flex; flex-direction:column; gap:10px; overflow:auto; }
+
+  .idea-card {
+    background:var(--bg-elev); border:1px solid var(--border); border-radius:14px; padding:12px 14px;
+  }
+  .idea-title { font-size:14px; font-weight:600; line-height:1.35; margin:0 0 6px; }
+  .idea-meta { color:var(--muted); font-size:11px; display:flex; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+  .idea-badge { padding:1px 7px; border-radius:6px; font-size:10px; font-weight:600; }
+  .idea-badge.ready { background:rgba(16,185,129,.18); color:#6ee7b7; }
+  .idea-badge.pending { background:rgba(245,158,11,.18); color:var(--accent-2); }
+  .idea-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .btn-tiny { padding:5px 9px; font-size:11px; border-radius:7px; border:1px solid var(--border); background:var(--bg-elev-2); color:var(--fg); }
+
+  /* ------ pantalla detalle ------ */
+  .modal-view { background: radial-gradient(1200px 800px at 30% -10%, #1e293b 0%, #0f172a 60%); flex:1; display:flex; flex-direction:column; }
+  .modal-head {
+    padding:38px 20px 14px; display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--border);
+  }
+  .modal-head .back { color:var(--accent); font-size:14px; font-weight:600; background:transparent; border:none; }
+  .modal-head h3 { margin:0; font-size:15px; }
+  .modal-body { padding:16px 20px; overflow:auto; flex:1; font-size:13px; line-height:1.5; }
+  .modal-body .idea-text { color:var(--fg); margin-bottom:14px; padding:10px 12px; background:var(--bg-elev); border-radius:10px; }
+  .advance { border-left:2px solid var(--accent); padding-left:10px; margin:10px 0; color:var(--muted); font-size:12px; }
+  .advance .a-date { font-size:10px; text-transform:uppercase; letter-spacing:1px; margin-bottom:2px; }
+  .episode { background:var(--bg-elev-2); border-radius:10px; padding:12px; margin:12px 0; }
+  .episode-title { font-weight:600; font-size:13px; margin:0 0 4px; }
+  .episode-date { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+  .episode audio { width:100%; margin-top:8px; }
+  .episode-summary { color:var(--muted); font-size:12px; margin:8px 0 0; }
+</style></head>
+<body>
+  <h1 class="desc">
+    Así se va a ver Tormenta de Ideas en tu iPhone. Tres vistas: PIN de entrada,
+    lista de ideas con el botón grande de grabación, y detalle de una idea con
+    sus avances y episodios.
+  </h1>
+
+  <div class="phones">
+
+    <!-- ============ PANTALLA 1: PIN ============ -->
+    <div class="phone">
+      <div class="screen">
+        <div class="pin">
+          <div class="brand">⚡ Tormenta<span>de Ideas</span></div>
+          <p class="pin-hint">Ingresá tu PIN de 4 dígitos</p>
+          <div class="pin-dots">
+            <div class="dot filled"></div>
+            <div class="dot filled"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+          </div>
+          <div class="pin-pad">
+            <button class="pin-key">1</button>
+            <button class="pin-key">2</button>
+            <button class="pin-key">3</button>
+            <button class="pin-key">4</button>
+            <button class="pin-key">5</button>
+            <button class="pin-key">6</button>
+            <button class="pin-key">7</button>
+            <button class="pin-key">8</button>
+            <button class="pin-key">9</button>
+            <button class="pin-key ghost">↺</button>
+            <button class="pin-key">0</button>
+            <button class="pin-key ghost">⌫</button>
+          </div>
+          <p class="ios-hint">💡 Tip: en iPhone tocá <b>Compartir</b> ⬆ → <b>Agregar a Inicio</b> para instalarla como app.</p>
+        </div>
+      </div>
+      <div class="phone-label">Vista 1 — Bienvenida con PIN</div>
+    </div>
+
+    <!-- ============ PANTALLA 2: MAIN ============ -->
+    <div class="phone">
+      <div class="screen">
+        <div class="main">
+          <div class="topbar">
+            <h1 class="brand-small">⚡ Tormenta</h1>
+            <div class="sync-badge" title="Sincronizado">●</div>
+          </div>
+          <div class="main-body">
+            <div class="record-area">
+              <button class="record-btn">
+                <span class="record-icon">🎤</span>
+                <span>Nueva idea</span>
+              </button>
+              <p class="record-hint">Tocá para hablar</p>
+            </div>
+            <div class="ideas-section">
+              <h2>Ideas capturadas <span class="count">3</span></h2>
+              <div class="ideas-list">
+                <div class="idea-card">
+                  <div class="idea-title">Consolidar las redes sociales de UP Osorno...</div>
+                  <div class="idea-meta">
+                    <span>5 jul, 14:22</span>
+                    <span>· 2 avances</span>
+                    <span class="idea-badge ready">🎧 2 episodios</span>
+                  </div>
+                  <div class="idea-actions">
+                    <button class="btn-tiny">Abrir</button>
+                    <button class="btn-tiny">➕ Marcar avance</button>
+                    <button class="btn-tiny">▶ Último episodio</button>
+                  </div>
+                </div>
+                <div class="idea-card">
+                  <div class="idea-title">Probar un menú corto en Botanic para el finde largo</div>
+                  <div class="idea-meta">
+                    <span>4 jul, 20:03</span>
+                    <span>· 0 avances</span>
+                    <span class="idea-badge pending">⏳ preparando</span>
+                  </div>
+                  <div class="idea-actions">
+                    <button class="btn-tiny">Abrir</button>
+                    <button class="btn-tiny">➕ Marcar avance</button>
+                  </div>
+                </div>
+                <div class="idea-card">
+                  <div class="idea-title">Estructurar el holding — hijas 01a a 01d y quién ejecuta cada una</div>
+                  <div class="idea-meta">
+                    <span>3 jul, 09:12</span>
+                    <span>· 1 avance</span>
+                    <span class="idea-badge ready">🎧 1 episodio</span>
+                  </div>
+                  <div class="idea-actions">
+                    <button class="btn-tiny">Abrir</button>
+                    <button class="btn-tiny">➕ Marcar avance</button>
+                    <button class="btn-tiny">▶ Último episodio</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Vista 2 — Home con botón grande + lista</div>
+    </div>
+
+    <!-- ============ PANTALLA 3: DETALLE ============ -->
+    <div class="phone">
+      <div class="screen">
+        <div class="modal-view">
+          <div class="modal-head">
+            <button class="back">← Volver</button>
+            <h3>Consolidar redes UP Osorno</h3>
+            <div></div>
+          </div>
+          <div class="modal-body">
+            <div class="idea-text">
+              "Consolidar las redes sociales de UP Osorno, que hoy están fragmentadas
+              en cinco Facebooks distintos, un Instagram con 40 mil y un TikTok con
+              apenas 1.6 mil..."
+            </div>
+
+            <div class="advance">
+              <div class="a-date">4 jul · avance 1</div>
+              Ya hice el inventario. La página con 12k y el nombre correcto es la
+              candidata a hub. Falta que Nadia me pase el acceso de admin.
+            </div>
+            <div class="advance">
+              <div class="a-date">5 jul · avance 2</div>
+              Nadia me dio acceso. Business Manager dice que 3 de 5 son elegibles
+              para fusión. Voy a arrancar mañana.
+            </div>
+
+            <div class="episode">
+              <div class="episode-title">🎧 Episodio 1 · La discoteca que se olvidó...</div>
+              <div class="episode-date">5 jul · 10 min 12 seg</div>
+              <div class="episode-summary">Por qué tener cinco Facebooks es lo mismo
+                que no tener ninguno, y cómo salir del hoyo sin perder los seguidores
+                viejos ni matar el tráfico nuevo.</div>
+              <audio controls preload="none"></audio>
+            </div>
+
+            <div class="episode">
+              <div class="episode-title">🎧 Episodio 2 · Cómo entra Instagram al hub</div>
+              <div class="episode-date">5 jul · 10 min 34 seg</div>
+              <div class="episode-summary">Ahora que Facebook está consolidado,
+                el próximo desafío es que Instagram y el nuevo hub compartan pixel
+                y audiencia sin canibalizarse.</div>
+              <audio controls preload="none"></audio>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Vista 3 — Detalle con avances + episodios</div>
+    </div>
+  </div>
+</body></html>

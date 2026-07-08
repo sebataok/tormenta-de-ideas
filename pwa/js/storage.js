@@ -126,6 +126,37 @@ export const Storage = {
     return clean.slice(0, 57) + '...';
   },
 
+  async deleteAdvance(advanceId, ideaId) {
+    const now = new Date().toISOString();
+    const t = tx(this.db, ['advances', 'ideas', 'outbox'], 'readwrite');
+    t.objectStore('advances').delete(advanceId);
+    // reducir priority de la idea si la teníamos cargada
+    if (ideaId) {
+      const req = t.objectStore('ideas').get(ideaId);
+      req.onsuccess = () => {
+        const idea = req.result;
+        if (idea) {
+          idea.priority = Math.max(0, (idea.priority || 0) - 1);
+          idea.updated_at = now;
+          t.objectStore('ideas').put(idea);
+          t.objectStore('outbox').add({ op: 'upsert_idea', payload: idea, ts: now });
+        }
+      };
+    }
+    t.objectStore('outbox').add({ op: 'delete_advance', payload: { id: advanceId }, ts: now });
+    await new Promise((res, rej) => { t.oncomplete = res; t.onerror = () => rej(t.error); });
+    this.syncNow().catch(() => {});
+  },
+
+  async deleteEpisode(episodeId) {
+    const now = new Date().toISOString();
+    const t = tx(this.db, ['episodes', 'outbox'], 'readwrite');
+    t.objectStore('episodes').delete(episodeId);
+    t.objectStore('outbox').add({ op: 'delete_episode', payload: { id: episodeId }, ts: now });
+    await new Promise((res, rej) => { t.oncomplete = res; t.onerror = () => rej(t.error); });
+    this.syncNow().catch(() => {});
+  },
+
   async deleteIdea(ideaId) {
     // 1) Borrar local (ideas + advances + episodes de esa idea)
     const t = tx(this.db, ['ideas', 'advances', 'episodes', 'outbox'], 'readwrite');
@@ -173,6 +204,12 @@ export const Storage = {
       } else if (item.op === 'delete_idea') {
         // FK con ON DELETE CASCADE limpia advances/episodes en el server.
         url = `${cfg.SUPABASE_URL}/rest/v1/ideas?id=eq.${encodeURIComponent(item.payload.id)}`;
+        method = 'DELETE';
+      } else if (item.op === 'delete_advance') {
+        url = `${cfg.SUPABASE_URL}/rest/v1/advances?id=eq.${encodeURIComponent(item.payload.id)}`;
+        method = 'DELETE';
+      } else if (item.op === 'delete_episode') {
+        url = `${cfg.SUPABASE_URL}/rest/v1/episodes?id=eq.${encodeURIComponent(item.payload.id)}`;
         method = 'DELETE';
       }
       if (!url) { await this._removeOutbox(item.id); continue; }

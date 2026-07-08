@@ -117,21 +117,75 @@ async function openIdea(id) {
     <p style="color:var(--muted);font-size:12px">${fmtDate(idea.created_at)}</p>
     <p>${escapeHtml(idea.text || '')}</p>
     ${advances.map(a => `
-      <div class="advance">
-        <div style="font-size:11px;color:var(--muted)">${fmtDate(a.created_at)}</div>
-        <div>${escapeHtml(a.text)}</div>
+      <div class="advance" style="display:flex;gap:8px;align-items:flex-start">
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--muted)">${fmtDate(a.created_at)}</div>
+          <div>${escapeHtml(a.text)}</div>
+        </div>
+        <button class="modal-del" data-act="del-adv" data-id="${a.id}" data-idea="${id}" title="Borrar avance">✕</button>
       </div>
     `).join('')}
     ${episodes.map((ep, i) => `
-      <div class="episode">
+      <div class="episode" style="position:relative">
+        <button class="modal-del" data-act="del-ep" data-id="${ep.id}" style="position:absolute;top:8px;right:8px" title="Borrar episodio">✕</button>
         <div style="font-weight:600">🎧 Episodio ${ep.number || i + 1}</div>
         <div style="font-size:11px;color:var(--muted)">${fmtDate(ep.created_at)}</div>
         ${ep.summary ? `<p style="margin:6px 0 0">${escapeHtml(ep.summary)}</p>` : ''}
         ${ep.audio_url ? `<audio controls preload="none" src="${ep.audio_url}"></audio>` : '<div style="color:var(--muted);font-size:12px">Sin audio aún</div>'}
       </div>
     `).join('')}
+    <div class="modal-danger-zone">
+      <button class="btn danger-big" data-act="del-idea" data-id="${id}">🗑 Borrar esta idea completa</button>
+      <p class="modal-danger-hint">Se borran también sus ${advances.length} avance${advances.length===1?'':'s'} y ${episodes.length} episodio${episodes.length===1?'':'s'}. Tocá dos veces para confirmar.</p>
+    </div>
   `;
   modal.hidden = false;
+
+  body.onclick = async (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const { act } = btn.dataset;
+    const doDouble = async (label, run) => {
+      if (btn.dataset.confirm === '1') {
+        clearTimeout(btn._to);
+        await run();
+      } else {
+        btn.dataset.confirm = '1';
+        btn._origText = btn.textContent;
+        btn.textContent = label;
+        btn.classList.add('danger-active');
+        btn._to = setTimeout(() => {
+          btn.dataset.confirm = '';
+          btn.textContent = btn._origText;
+          btn.classList.remove('danger-active');
+        }, 3500);
+      }
+    };
+    if (act === 'del-adv') {
+      await doDouble('¿Seguro? ✕', async () => {
+        await Storage.deleteAdvance(btn.dataset.id, btn.dataset.idea);
+        toast('Avance borrado');
+        openIdea(id);
+        renderList();
+      });
+    }
+    if (act === 'del-ep') {
+      await doDouble('¿Seguro? ✕', async () => {
+        await Storage.deleteEpisode(btn.dataset.id);
+        toast('Episodio borrado');
+        openIdea(id);
+        renderList();
+      });
+    }
+    if (act === 'del-idea') {
+      await doDouble('¿Confirmás borrar TODO? 🗑', async () => {
+        await Storage.deleteIdea(btn.dataset.id);
+        toast('Idea borrada');
+        modal.hidden = true;
+        renderList();
+      });
+    }
+  };
 }
 $('#modal-close')?.addEventListener('click', () => { $('#modal').hidden = true; });
 $('#modal')?.addEventListener('click', (e) => { if (e.target.id === 'modal') $('#modal').hidden = true; });

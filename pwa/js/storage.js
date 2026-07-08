@@ -126,6 +126,25 @@ export const Storage = {
     return clean.slice(0, 57) + '...';
   },
 
+  async deleteIdea(ideaId) {
+    // 1) Borrar local (ideas + advances + episodes de esa idea)
+    const t = tx(this.db, ['ideas', 'advances', 'episodes', 'outbox'], 'readwrite');
+    t.objectStore('ideas').delete(ideaId);
+    // Advances de esa idea
+    const advIdx = t.objectStore('advances').index('by_idea');
+    const advReq = advIdx.getAllKeys(IDBKeyRange.only(ideaId));
+    advReq.onsuccess = () => (advReq.result || []).forEach(k => t.objectStore('advances').delete(k));
+    // Episodes de esa idea
+    const epIdx = t.objectStore('episodes').index('by_idea');
+    const epReq = epIdx.getAllKeys(IDBKeyRange.only(ideaId));
+    epReq.onsuccess = () => (epReq.result || []).forEach(k => t.objectStore('episodes').delete(k));
+    // Encolar delete en outbox para propagar al server
+    t.objectStore('outbox').add({ op: 'delete_idea', payload: { id: ideaId }, ts: new Date().toISOString() });
+    await new Promise((res, rej) => { t.oncomplete = res; t.onerror = () => rej(t.error); });
+    // Sync inmediato si hay red
+    this.syncNow().catch(() => {});
+  },
+
   // ---------- SYNC ----------
   async _flushOutbox() {
     const cfg = window.TORMENTA_CONFIG || {};
@@ -144,18 +163,27 @@ export const Storage = {
     let ok = 0;
 
     for (const item of items) {
-      const url =
-        item.op === 'upsert_idea'    ? `${cfg.SUPABASE_URL}/rest/v1/ideas`    :
-        item.op === 'upsert_advance' ? `${cfg.SUPABASE_URL}/rest/v1/advances` :
-        null;
+      let url = null, method = 'POST', body = null;
+      if (item.op === 'upsert_idea') {
+        url = `${cfg.SUPABASE_URL}/rest/v1/ideas`;
+        body = JSON.stringify(item.payload);
+      } else if (item.op === 'upsert_advance') {
+        url = `${cfg.SUPABASE_URL}/rest/v1/advances`;
+        body = JSON.stringify(item.payload);
+      } else if (item.op === 'delete_idea') {
+        // FK con ON DELETE CASCADE limpia advances/episodes en el server.
+        url = `${cfg.SUPABASE_URL}/rest/v1/ideas?id=eq.${encodeURIComponent(item.payload.id)}`;
+        method = 'DELETE';
+      }
       if (!url) { await this._removeOutbox(item.id); continue; }
       try {
-        const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(item.payload) });
-        if (r.ok || r.status === 409) {
+        const opts = { method, headers };
+        if (body) opts.body = body;
+        const r = await fetch(url, opts);
+        if (r.ok || r.status === 409 || r.status === 204) {
           await this._removeOutbox(item.id);
           ok++;
         } else {
-          // deja el item para reintento; no rompas la corrida
           console.warn('sync fail', item.op, r.status);
           break;
         }

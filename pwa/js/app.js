@@ -61,6 +61,7 @@ async function renderList() {
         <button class="btn-tiny" data-act="open" data-id="${idea.id}">Abrir</button>
         <button class="btn-tiny" data-act="advance" data-id="${idea.id}">➕ Marcar avance</button>
         ${episodes.length ? `<button class="btn-tiny" data-act="play" data-id="${idea.id}">▶ Último episodio</button>` : ''}
+        <button class="btn-tiny danger" data-act="delete" data-id="${idea.id}" title="Borrar idea">🗑</button>
       </div>
     `;
     list.appendChild(li);
@@ -79,6 +80,24 @@ async function renderList() {
       const last = eps[0];
       if (last?.audio_url) window.open(last.audio_url, '_blank');
       else toast('El episodio aún no está listo');
+    }
+    if (act === 'delete') {
+      // Confirmación doble-toque: primera vez cambia a "Confirmar", segunda ejecuta.
+      if (btn.dataset.confirm === '1') {
+        clearTimeout(btn._to);
+        await Storage.deleteIdea(id);
+        toast('Idea borrada');
+        await renderList();
+      } else {
+        btn.dataset.confirm = '1';
+        btn.textContent = '¿Seguro? 🗑';
+        btn.classList.add('danger-active');
+        btn._to = setTimeout(() => {
+          btn.dataset.confirm = '';
+          btn.textContent = '🗑';
+          btn.classList.remove('danger-active');
+        }, 3500);
+      }
     }
   };
 }

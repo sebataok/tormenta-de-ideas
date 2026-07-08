@@ -151,6 +151,15 @@ button { font-family: inherit; cursor: pointer; }
   padding: 6px 10px; font-size: 12px; border-radius: 8px; border: 1px solid var(--border);
   background: var(--bg-elev-2); color: var(--fg);
 }
+.idea-card .btn-tiny.danger { color: #fca5a5; border-color: rgba(239,68,68,.35); }
+.idea-card .btn-tiny.danger-active {
+  background: var(--danger); color: #fff; border-color: var(--danger);
+  animation: pulse-danger 1.2s infinite;
+}
+@keyframes pulse-danger {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.5); }
+  50%      { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+}
 
 /* Modal */
 .modal {

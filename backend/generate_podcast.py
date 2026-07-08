@@ -35,6 +35,26 @@ RATE = os.environ.get("TTS_RATE", "+5%")   # ligeramente más rápida
 PITCH = os.environ.get("TTS_PITCH", "+0Hz")
 BUCKET = os.environ.get("PODCAST_BUCKET", "podcasts")
 
+# --- Límite duro de duración del podcast ---
+# Ningún episodio puede superar MAX_PODCAST_MINUTES minutos hablados.
+# A ~150 palabras/min (ritmo Catalina +5%), 30 min ≈ 4500 palabras.
+# Dejamos un pequeño margen (4400) para no rozar el techo.
+MAX_PODCAST_MINUTES = int(os.environ.get("MAX_PODCAST_MINUTES", "30"))
+WORDS_PER_MINUTE    = int(os.environ.get("WORDS_PER_MINUTE", "150"))
+MAX_WORDS = MAX_PODCAST_MINUTES * WORDS_PER_MINUTE - 100  # margen defensivo
+
+
+def target_words_for_episode(previous_scripts_count: int) -> tuple[int, int]:
+    """Rango objetivo (min, max) de palabras según el número de episodio.
+
+    Episodios más avanzados pueden ser más largos, pero nunca superan MAX_WORDS.
+    """
+    n = previous_scripts_count + 1
+    # Base 1500-1700 (10 min), va creciendo ~500 palabras por episodio hasta el tope.
+    lo = min(1500 + max(0, n - 1) * 400, MAX_WORDS - 400)
+    hi = min(1700 + max(0, n - 1) * 500, MAX_WORDS)
+    return lo, hi
+
 
 # ---------------- Prompt de guión ----------------
 SCRIPT_SYSTEM = """Eres un guionista de podcast en español chileno neutro. \
@@ -58,11 +78,17 @@ def script_user_prompt(idea: dict, advances: list[dict], previous_scripts: list[
             parts.append(f"--- EPISODIO {i} ---\n{s.strip()}\n")
 
     n = len(previous_scripts) + 1
+    lo_words, hi_words = target_words_for_episode(len(previous_scripts))
+    lo_min = lo_words // WORDS_PER_MINUTE
+    hi_min = hi_words // WORDS_PER_MINUTE
     parts.append(f"""
 TAREA:
 Escribe el guión del EPISODIO {n} sobre esta idea. Restricciones estrictas:
 
-- Longitud objetivo: 1500 a 1700 palabras (aprox. 10 minutos hablados a ritmo normal).
+- Longitud objetivo: {lo_words} a {hi_words} palabras
+  (aprox. {lo_min}–{hi_min} minutos hablados a ritmo normal).
+- LÍMITE ABSOLUTO: nunca pases de {MAX_WORDS} palabras
+  (equivale a {MAX_PODCAST_MINUTES} minutos de audio, tope duro del sistema).
 - Español chileno neutro. Sin modismos regionales pesados.
 - Estructura obligatoria, marcada con encabezados internos entre corchetes:
   [HOOK 30s] — Enganche fuerte. Presenta la pregunta o tensión central.
@@ -71,7 +97,9 @@ Escribe el guión del EPISODIO {n} sobre esta idea. Restricciones estrictas:
   [IDEA FUERZA 2] — 1 punto profundo, distinto ángulo.
   [IDEA FUERZA 3] — 1 punto profundo, cierra el arco.
   [CIERRE 2min] — 3 próximos pasos accionables y concretos para el oyente.
-- Cada episodio debe SER MÁS PROFUNDO que el anterior (sin repetir el material previo).
+- Cada episodio debe SER MÁS PROFUNDO que el anterior (sin repetir el material previo),
+  pero SIN sobrepasar el tope de {MAX_WORDS} palabras. Si tenés mucho material, priorizá
+  lo más denso y guardá el resto para el próximo avance.
 - Al inicio del guion, incluye una sola línea con formato:
     TITULO: <título breve del episodio>
     RESUMEN: <2 líneas sobre qué se cubre>
@@ -161,7 +189,20 @@ def generate_for_idea(sb: SupabaseClient, idea: dict) -> dict:
     print(f"  · pidiendo guión a Claude (contexto: {len(advances)} avances, {len(previous_scripts)} episodios previos)")
     raw = call_claude_for_script(system, user)
     title, summary, body = parse_title_summary(raw)
-    print(f"  · guión listo: '{title}' — {len(body.split())} palabras")
+    word_count = len(body.split())
+    est_minutes = word_count / WORDS_PER_MINUTE
+    print(f"  · guión listo: '{title}' — {word_count} palabras (≈ {est_minutes:.1f} min)")
+
+    # --- Enforce hard cap: si Claude se pasó de MAX_WORDS, truncamos ---
+    if word_count > MAX_WORDS:
+        print(f"  ⚠ excede el tope de {MAX_PODCAST_MINUTES} min ({MAX_WORDS} palabras). Truncando...")
+        words = body.split()
+        # Truncar dejando espacio para un cierre corto
+        keep = MAX_WORDS - 40
+        body = " ".join(words[:keep]).rstrip(",;:") + ". Hasta acá el episodio de hoy; en el próximo avance retomamos lo que quedó pendiente."
+        word_count = len(body.split())
+        est_minutes = word_count / WORDS_PER_MINUTE
+        print(f"  · guión truncado: {word_count} palabras (≈ {est_minutes:.1f} min)")
 
     # TTS
     with tempfile.TemporaryDirectory() as td:

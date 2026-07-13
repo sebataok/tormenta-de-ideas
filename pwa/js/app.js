@@ -300,14 +300,44 @@ function startAdvance(ideaId) {
 
   const goMain = async () => {
     goto('view-main');
+    // Pull inicial ANTES del primer render: garantiza que veas todo lo que
+    // haya en Supabase (grabado desde otro dispositivo) al abrir la app.
+    try { await Storage.syncNow(); } catch (e) { console.warn('sync inicial falló', e); }
     await renderList();
-    Storage.startAutoSync(30000, (status) => {
+
+    // Auto-sync cada 15s + re-render automático cuando llegan datos nuevos.
+    Storage.startAutoSync(
+      15000,
+      (status) => {
+        const b = $('#sync-badge');
+        b.classList.remove('ok', 'pending', 'err');
+        if (status === 'ok') b.classList.add('ok');
+        else if (status === 'pending') b.classList.add('pending');
+        else if (status === 'err') b.classList.add('err');
+      },
+      () => { renderList(); }  // <- fix: re-render al detectar cambios remotos
+    );
+
+    // Sync manual: tocar el badge fuerza una corrida ya.
+    $('#sync-badge').addEventListener('click', async () => {
       const b = $('#sync-badge');
-      b.classList.remove('ok', 'pending', 'err');
-      if (status === 'ok') b.classList.add('ok');
-      else if (status === 'pending') b.classList.add('pending');
-      else if (status === 'err') b.classList.add('err');
+      b.classList.remove('ok', 'err');
+      b.classList.add('pending');
+      try {
+        const r = await Storage.syncNow();
+        if (r?.changed) await renderList();
+        toast(r?.changed ? 'Sincronizado (datos nuevos)' : 'Sincronizado');
+        b.classList.remove('pending');
+        b.classList.add('ok');
+      } catch {
+        b.classList.remove('pending');
+        b.classList.add('err');
+        toast('Error de sync');
+      }
     });
+    $('#sync-badge').style.cursor = 'pointer';
+    $('#sync-badge').title = 'Tocá para forzar sync';
+
     if (!isSpeechSupported()) {
       toast('Web Speech no soportada. Se guardará sólo el audio.');
     }

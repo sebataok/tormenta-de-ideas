@@ -242,58 +242,100 @@ export const Storage = {
     if (!cfg.SUPABASE_URL || cfg.SUPABASE_URL.includes('YOUR-PROJECT')) return { skipped: true };
     const headers = { 'apikey': cfg.SUPABASE_ANON, 'Authorization': `Bearer ${cfg.SUPABASE_ANON}` };
 
-    // ideas
-    try {
-      const r = await fetch(`${cfg.SUPABASE_URL}/rest/v1/ideas?select=*&order=updated_at.desc`, { headers });
-      if (r.ok) {
-        const rows = await r.json();
-        const t = tx(this.db, ['ideas'], 'readwrite');
-        rows.forEach(row => t.objectStore('ideas').put(row));
-      }
-    } catch (e) { console.warn('pull ideas', e); }
+    // Reconciliación bidireccional real:
+    //  - Server manda todos sus ids con updated_at.
+    //  - Local se queda con lo que tenga updated_at más nuevo O si server no lo tiene ya no fue borrado local.
+    //  - Los ids que tiene el server y NO están en local → se agregan.
+    //  - Los ids que tiene local y NO están en server, pero tampoco en outbox como delete → se conservan
+    //    (probablemente son ideas locales que aún no se sincronizaron).
+    let changed = false;
 
-    // advances
-    try {
-      const r = await fetch(`${cfg.SUPABASE_URL}/rest/v1/advances?select=*`, { headers });
-      if (r.ok) {
+    const pullTable = async (path, storeName) => {
+      try {
+        const r = await fetch(`${cfg.SUPABASE_URL}/rest/v1/${path}`, { headers });
+        if (!r.ok) return;
         const rows = await r.json();
-        const t = tx(this.db, ['advances'], 'readwrite');
-        rows.forEach(row => t.objectStore('advances').put(row));
-      }
-    } catch (e) { console.warn('pull advances', e); }
 
-    // episodes
-    try {
-      const r = await fetch(`${cfg.SUPABASE_URL}/rest/v1/episodes?select=*&order=created_at.desc`, { headers });
-      if (r.ok) {
-        const rows = await r.json();
-        const t = tx(this.db, ['episodes'], 'readwrite');
-        rows.forEach(row => t.objectStore('episodes').put(row));
-      }
-    } catch (e) { console.warn('pull episodes', e); }
+        // leer estado actual local para comparar
+        const t0 = tx(this.db, [storeName]);
+        const localRows = await req2p(t0.objectStore(storeName).getAll());
+        const localById = new Map(localRows.map(r => [r.id, r]));
+        const remoteById = new Map(rows.map(r => [r.id, r]));
 
-    return { ok: true };
+        const t = tx(this.db, [storeName], 'readwrite');
+        const store = t.objectStore(storeName);
+
+        // upsert: si el remoto tiene updated_at (o created_at) más nuevo, guardar
+        rows.forEach(row => {
+          const local = localById.get(row.id);
+          if (!local) {
+            store.put(row);
+            changed = true;
+          } else {
+            const rTs = row.updated_at || row.created_at || '';
+            const lTs = local.updated_at || local.created_at || '';
+            if (rTs > lTs) { store.put(row); changed = true; }
+          }
+        });
+
+        // Si el remoto ya NO tiene un id que local sí tiene → es una idea remota borrada.
+        // Solo borrar del local si NO está pendiente en el outbox como upsert (o sea, no
+        // es una idea local recién creada que aún no subió).
+        const outboxItems = await req2p(tx(this.db, ['outbox']).objectStore('outbox').getAll());
+        const pendingIds = new Set(
+          outboxItems
+            .filter(o => o.op && o.op.startsWith('upsert_'))
+            .map(o => o.payload && o.payload.id)
+            .filter(Boolean)
+        );
+        localRows.forEach(local => {
+          if (!remoteById.has(local.id) && !pendingIds.has(local.id)) {
+            store.delete(local.id);
+            changed = true;
+          }
+        });
+
+        await new Promise((res, rej) => { t.oncomplete = res; t.onerror = () => rej(t.error); });
+      } catch (e) { console.warn('pull', path, e); }
+    };
+
+    await pullTable('ideas?select=*&order=updated_at.desc',    'ideas');
+    await pullTable('advances?select=*',                        'advances');
+    await pullTable('episodes?select=*&order=created_at.desc', 'episodes');
+
+    return { ok: true, changed };
   },
 
   async syncNow() {
     const outRes = await this._flushOutbox();
-    await this.pullFromSupabase();
-    return outRes;
+    const pullRes = await this.pullFromSupabase();
+    return { ...outRes, changed: !!pullRes?.changed };
   },
 
-  startAutoSync(intervalMs = 30000, onStatus = () => {}) {
+  /**
+   * Auto-sync.
+   * @param {number} intervalMs
+   * @param {(status:'pending'|'ok'|'err'|'idle')=>void} onStatus
+   * @param {()=>void} onChanged — se llama cuando el pull trajo datos nuevos.
+   */
+  startAutoSync(intervalMs = 30000, onStatus = () => {}, onChanged = () => {}) {
     const tick = async () => {
       try {
         onStatus('pending');
         const r = await this.syncNow();
         if (r?.skipped) { onStatus('idle'); return; }
         onStatus(r?.remaining ? 'pending' : 'ok');
+        if (r?.changed) onChanged();
       } catch (e) {
+        console.warn('sync tick err', e);
         onStatus('err');
       }
     };
     tick();
     window.addEventListener('online', tick);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') tick();
+    });
     return setInterval(tick, intervalMs);
   }
 };

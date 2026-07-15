@@ -146,6 +146,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .idea-card .badge.ready { background: rgba(16,185,129,.2); color: #6ee7b7; }
 .idea-card .badge.pending { background: rgba(245,158,11,.2); color: var(--accent-2); }
+.idea-card .badge.paused { background: rgba(148,163,184,.25); color: #cbd5e1; }
 .idea-card button.link { background: transparent; border: none; color: var(--accent); font-weight: 600; font-size: 13px; padding: 4px 0; }
 .idea-card .btn-tiny {
   padding: 6px 10px; font-size: 12px; border-radius: 8px; border: 1px solid var(--border);

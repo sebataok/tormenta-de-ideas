@@ -126,6 +126,29 @@ export const Storage = {
     return clean.slice(0, 57) + '...';
   },
 
+  /**
+   * Toggle entre 'paused' y su status activo.
+   * - Si estaba 'paused' → vuelve a 'pending_deepdive' (si tiene avances) o 'pending_research'.
+   * - Si estaba activa  → pasa a 'paused' (no la procesa el backend).
+   */
+  async toggleIdeaPause(id) {
+    const now = new Date().toISOString();
+    const t = tx(this.db, ['ideas', 'outbox'], 'readwrite');
+    const cur = await req2p(t.objectStore('ideas').get(id));
+    if (!cur) return null;
+    if (cur.status === 'paused') {
+      cur.status = (cur.priority || 0) > 0 ? 'pending_deepdive' : 'pending_research';
+    } else {
+      cur.status = 'paused';
+    }
+    cur.updated_at = now;
+    t.objectStore('ideas').put(cur);
+    t.objectStore('outbox').add({ op: 'upsert_idea', payload: cur, ts: now });
+    await new Promise((res, rej) => { t.oncomplete = res; t.onerror = () => rej(t.error); });
+    this.syncNow().catch(() => {});
+    return cur;
+  },
+
   async deleteAdvance(advanceId, ideaId) {
     const now = new Date().toISOString();
     const t = tx(this.db, ['advances', 'ideas', 'outbox'], 'readwrite');

@@ -47,9 +47,12 @@ async function renderList() {
     const episodes = await Storage.listEpisodes(idea.id);
     const li = document.createElement('li');
     li.className = 'idea-card';
-    const status = episodes.length
-      ? `<span class="badge ready">🎧 ${episodes.length} episodio${episodes.length > 1 ? 's' : ''}</span>`
-      : `<span class="badge pending">⏳ preparando</span>`;
+    const isPaused = idea.status === 'paused';
+    const status = isPaused
+      ? `<span class="badge paused">⏸ pausada</span>`
+      : (episodes.length
+          ? `<span class="badge ready">🎧 ${episodes.length} episodio${episodes.length > 1 ? 's' : ''}</span>`
+          : `<span class="badge pending">⏳ preparando</span>`);
     li.innerHTML = `
       <div class="title">${escapeHtml(idea.title || '(sin título)')}</div>
       <div class="meta">
@@ -61,6 +64,7 @@ async function renderList() {
         <button class="btn-tiny" data-act="open" data-id="${idea.id}">Abrir</button>
         <button class="btn-tiny" data-act="advance" data-id="${idea.id}">➕ Marcar avance</button>
         ${episodes.length ? `<button class="btn-tiny" data-act="play" data-id="${idea.id}">▶ Último episodio</button>` : ''}
+        <button class="btn-tiny" data-act="pause" data-id="${idea.id}" title="${isPaused ? 'Reactivar' : 'Pausar generación de nuevos episodios'}">${isPaused ? '▶ Reactivar' : '⏸ Pausar'}</button>
         <button class="btn-tiny danger" data-act="delete" data-id="${idea.id}" title="Borrar idea">🗑</button>
       </div>
     `;
@@ -74,6 +78,11 @@ async function renderList() {
     const id = btn.dataset.id;
     if (act === 'open') openIdea(id);
     if (act === 'advance') startAdvance(id);
+    if (act === 'pause') {
+      const upd = await Storage.toggleIdeaPause(id);
+      toast(upd?.status === 'paused' ? 'Idea pausada' : 'Idea reactivada');
+      await renderList();
+    }
     if (act === 'play') {
       const eps = await Storage.listEpisodes(id);
       eps.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));

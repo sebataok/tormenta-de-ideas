@@ -3,7 +3,7 @@
 //   - shell (HTML/CSS/JS/manifest/iconos): cache-first, actualiza en background
 //   - datos (fetches a Supabase): network-first, sin cache
 
-const VERSION = 'tormenta-shell-v5';
+const VERSION = 'tormenta-shell-v6';
 const SHELL = [
   './',
   './index.html',
